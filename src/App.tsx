@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { use100vh } from 'react-div-100vh';
 import styled from 'styled-components';
 import { Image } from './components/Image';
@@ -26,6 +27,7 @@ const Sidebar = styled.div`
 
 function App() {
   const pageHeight = use100vh() ?? 0
+  const [disabled, setDisabled] = useState(false)
 
   const { value: hue, ...hueState } = useSliderState('Hue')
   const { value: saturation, ...saturationState } = useSliderState('Saturation')
@@ -34,8 +36,26 @@ function App() {
   const { value: green, ...greenState } = useSliderState('Green')
   const { value: blue, ...blueState } = useSliderState('Blue')
 
+  const { value: color1, ...color1State } = useSliderState('Blue')
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === '\\') {
+        setDisabled(b => !b)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    setDisabled(false)
+  }, [hue, saturation, lightness, red, green, blue])
+
   return (
-    <Page style={{minHeight: pageHeight}}>
+    <Page style={{height: pageHeight}}>
       {(
         <>
           <ImageWrap>
@@ -46,11 +66,14 @@ function App() {
               red={red}
               green={green}
               blue={blue}
-              src={'/image1.jpeg'}
-              zoom={0.75}
+              src={'/landscape2.jpeg'}
+              // zoom={0.75}
+              disabled={disabled}
+              color1={color1}
             />
           </ImageWrap>
           <Sidebar>
+            <h3>Basics</h3>
             <Slider 
               value={hue}
               {...hueState}
@@ -64,6 +87,7 @@ function App() {
               {...lightnessState}
             />
 
+            <h3>RGB Channels</h3>
             <Slider 
               value={red}
               {...redState}
@@ -75,6 +99,12 @@ function App() {
             <Slider 
               value={blue}
               {...blueState}
+            />
+
+            <h3>Hue shifting</h3>
+            <Slider
+              value={color1}
+              {...color1State}
             />
             
           </Sidebar>

@@ -2,21 +2,112 @@
 
 import { useRef, useMemo, useEffect, useState } from 'react'
 import { GPU } from 'gpu.js'
+import styled from 'styled-components'
+
+const HistCanvas = styled.canvas`
+  position: fixed;
+  bottom 10px;
+  left: 10px;
+  opacity: 0.25;
+  z-index: 100;
+
+  :hover {
+    opacity: 1;
+  }
+`
+
+function rgbToLuminance(r, g, b) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+
+  let maxVal = 0
+  let minVal = 0
+
+  maxVal = Math.max(r, g, b)
+  minVal = Math.min(r, g, b)
+
+  return (maxVal + minVal) / 2;
+}
+
+function drawHist(ctx, data) {
+  const lum = Array(256).fill(0)
+  const r = Array(256).fill(0)
+  const g = Array(256).fill(0)
+  const b = Array(256).fill(0)
+
+  for (let i = 0; i < data.length; i += 4) {
+    const rgb = [data[i], data[i+1], data[i+2]]
+    const l = Math.round(rgbToLuminance(...rgb) * 256)
+    lum[l] += 1
+    r[rgb[0]] += 1
+    g[rgb[1]] += 1
+    b[rgb[2]] += 1
+  }
+
+  ctx.beginPath();
+  ctx.rect(0,0,WIDTH,HEIGHT);
+  ctx.fillStyle = 'black'
+  ctx.fill();
+
+  const barWidth = WIDTH/lum.length
+
+  const max = Math.max(...lum)
+
+  function drawBar(i, bar, color) {
+    const barHeight = (bar/max)*HEIGHT
+    
+    const x = barWidth * i
+    const y = HEIGHT - barHeight
+    ctx.beginPath();
+    ctx.rect(x, y, barWidth, barHeight);
+    ctx.fillStyle = color
+    ctx.fill();
+  }
+
+  for (let i = 0; i < lum.length; i++) {
+    // drawBar(i, lum[i], 'white')
+    drawBar(i, r[i], 'rgba(255,0,0,0.75)')
+    drawBar(i, g[i], 'rgba(0,255,0,0.75)')
+    drawBar(i, b[i], 'rgba(0,0,255,0.75)')
+  }
+}
+
+
+const WIDTH = 200
+const HEIGHT = 100
 
 export function Image({
   saturation,
   lightness,
   hue,
   src,
-  zoom,
+  // zoom,
   red,
   green,
-  blue
+  blue,
+  disabled,
+  color1
 }) {
   const ref = useRef(null)
+  const histRef = useRef(null)
   const [loaded, setLoaded] = useState(false)
   const imageRef = useRef(document.createElement('img'))
   const [[height, width], setDimensions] = useState([])
+  const [zoom, setZoom] = useState(1)
+
+  useEffect(() => {
+    function updateZoom() {
+      const widthZoom = (window.innerWidth - 350) / width
+      const heightZoom = (window.innerHeight - 150) / height
+      setZoom(Math.min(widthZoom, heightZoom))
+    }
+    updateZoom()
+    window.addEventListener('resize', updateZoom)
+    return () => {
+      window.removeEventListener('resize', updateZoom)
+    }
+  }, [width, height])
 
   useEffect(() => {
     const img = imageRef.current
@@ -36,7 +127,7 @@ export function Image({
   )
 
   useEffect(() => {
-    if (!ref.current || !loaded) return
+    if (!ref.current || !histRef.current || !loaded) return
 
     const kernel = gpu.createKernel(`function (image) {
 
@@ -119,22 +210,30 @@ export function Image({
         return [(r * 255), (g * 255), (b * 255), (a * 255)];
       }
 
-      const { saturation, lightness, hue, red, green, blue } = this.constants
+      let rgb = image[this.thread.y][this.thread.x];
 
-      const pixel = image[this.thread.y][this.thread.x];
-      let hsl = rgbToHsl(pixel[0], pixel[1], pixel[2], pixel[3])
+      const { saturation, lightness, hue, red, green, blue, disabled, color1 } = this.constants
 
-      hsl[0] = (hsl[0] + (hue-0.5)) % 1
-      hsl[1] = lerp(invlerp(0.5, 3, saturation), invlerp(0, 0.5, saturation), hsl[1])
-      hsl[2] = lerp(invlerp(0.5, 300, lightness), invlerp(0, 0.5, lightness), hsl[2])
+      if (disabled) {
+        this.color(rgb[0], rgb[1], rgb[2], rgb[3]);
+      } else {
+        rgb[0] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, red), rgb[0])
+        rgb[1] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, green), rgb[1])
+        rgb[2] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, blue), rgb[2])
 
-      let rgb = hslToRgb(hsl[0], hsl[1], hsl[2], hsl[3])
-      
-      rgb[0] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, red), rgb[0])
-      rgb[1] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, green), rgb[1])
-      rgb[2] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, blue), rgb[2])
+        let hsl = rgbToHsl(rgb[0], rgb[1], rgb[2], rgb[3])
 
-      this.color(rgb[0], rgb[1], rgb[2], rgb[3]);
+        if (hsl[1] >= 220/360 && hsl[1] < 270/360) {
+          hsl[1] = (hsl[1] + lerp(-0.5, 0.5, color1) + 1) % 1 
+        }
+
+        hsl[0] = (hsl[0] + (hue-0.5)) % 1
+        hsl[1] = lerp(invlerp(0.5, 3, saturation), invlerp(0, 0.5, saturation), hsl[1])
+        hsl[2] = lerp(invlerp(0.5, 300, lightness), invlerp(0, 0.5, lightness), hsl[2])
+
+        rgb = hslToRgb(hsl[0], hsl[1], hsl[2], hsl[3])
+        this.color(rgb[0], rgb[1], rgb[2], rgb[3]);
+      }
     }`, {
       canvas: ref.current,
       graphical: true,
@@ -145,21 +244,44 @@ export function Image({
         hue,
         red,
         green,
-        blue
+        blue,
+        disabled,
+        color1
       }
     })
 
     kernel(imageRef.current);
-  }, [gpu, saturation, loaded, lightness, hue, height, width, red, green, blue])
+    // setPixels()
+
+    const pixels = kernel.getPixels()
+    const id = setTimeout(() => {
+      drawHist(histRef.current.getContext('2d'), pixels)
+    }, 0)
+    
+    return () => {
+      clearTimeout(id)
+    }
+  }, [gpu, saturation, loaded, lightness, hue, height, width, red, green, blue, disabled, color1])
 
   return (
-    <canvas
-      height={height}
-      width={width}
-      ref={ref}
-      style={{
-        transform: `scale(${zoom})`
-      }}
-    />
+    <>
+      {/* <Histogram
+        data={pixels}
+      /> */}
+
+      <HistCanvas
+        ref={histRef}
+        height={HEIGHT}
+        width={WIDTH}
+      />
+      <canvas
+        height={height}
+        width={width}
+        ref={ref}
+        style={{
+          transform: `scale(${zoom})`
+        }}
+      />
+    </>
   )
 }
