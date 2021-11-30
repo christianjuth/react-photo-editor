@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { use100vh } from 'react-div-100vh';
+import styled from 'styled-components';
 import { Image } from './components/Image';
-import styled from 'styled-components'
-import { use100vh } from 'react-div-100vh'
-import { Slider, useSliderState } from './components/Slider'
+import { Slider, useSliderState } from './components/Slider';
 
 const Page = styled.div`
   display: flex;

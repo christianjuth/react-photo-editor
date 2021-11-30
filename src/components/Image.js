@@ -124,18 +124,15 @@ export function Image({
       const pixel = image[this.thread.y][this.thread.x];
       let hsl = rgbToHsl(pixel[0], pixel[1], pixel[2], pixel[3])
 
-      // MODIFY IMAGE HERE
-      hsl[0] = lerp(invlerp(0.5, 1, hue), invlerp(0, 0.5, hue), hsl[0])
       hsl[0] = (hsl[0] + (hue-0.5)) % 1
-      hsl[1] = lerp(invlerp(0.5, 1, saturation), invlerp(0, 0.5, saturation), hsl[1])
-      hsl[2] = lerp(invlerp(0.5, 1, lightness), invlerp(0, 0.5, lightness), hsl[2])
+      hsl[1] = lerp(invlerp(0.5, 3, saturation), invlerp(0, 0.5, saturation), hsl[1])
+      hsl[2] = lerp(invlerp(0.5, 300, lightness), invlerp(0, 0.5, lightness), hsl[2])
 
       let rgb = hslToRgb(hsl[0], hsl[1], hsl[2], hsl[3])
       
       rgb[0] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, red), rgb[0])
       rgb[1] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, green), rgb[1])
       rgb[2] = lerp(invlerp(0.5, 1, red), invlerp(0, 0.5, blue), rgb[2])
-      // END MODIFY
 
       this.color(rgb[0], rgb[1], rgb[2], rgb[3]);
     }`, {
