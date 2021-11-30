@@ -38,7 +38,7 @@ export function Image({
   useEffect(() => {
     if (!ref.current || !loaded) return
 
-    const kernel = gpu.createKernel(function (image) {
+    const kernel = gpu.createKernel(`function (image) {
 
       function lerp(start, end, amt) {
         return (1 - amt) * start + amt * end
@@ -138,7 +138,7 @@ export function Image({
       // END MODIFY
 
       this.color(rgb[0], rgb[1], rgb[2], rgb[3]);
-    }, {
+    }`, {
       canvas: ref.current,
       graphical: true,
       output: [width,height],
